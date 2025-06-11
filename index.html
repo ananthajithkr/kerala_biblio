@@ -98,30 +98,42 @@
             { title: "Type", field: "type" },
             { title: "Publication", field: "publication", widthGrow: 2 },
             {
-              title: "Details",
-              formatter: () => "➕",
-              hozAlign: "center",
-              cellClick: function (e, cell) {
-                const row = cell.getRow();
-                const el = row.getElement().nextElementSibling;
+  title: "Details",
+  formatter: () => "➕",
+  hozAlign: "center",
+  cellClick: function (e, cell) {
+    const row = cell.getRow();
+    const data = row.getData();
+    const next = row.getElement().nextElementSibling;
 
-                if (el && el.classList.contains("json-detail")) {
-                  el.remove();
-                } else {
-                  const data = row.getData().full;
-                  const detail = document.createElement("div");
-                  detail.className = "json-detail";
-                  detail.innerHTML = `
-                    <strong>Abstract:</strong> ${data.abstractNote || '—'}<br/>
-                    <strong>URL:</strong> ${data.url ? `<a href="${data.url}" target="_blank">${data.url}</a>` : '—'}<br/>
-                    <strong>Tags:</strong> ${(data.tags || []).map(t => t.tag).join(", ") || '—'}<br/>
-                    <strong>DOI:</strong> ${data.DOI || '—'}<br/>
-                    <strong>Extra:</strong> ${data.extra || '—'}
-                  `;
-                  row.getElement().after(detail);
-                }
-              }
-            }
+    // If already expanded, remove it
+    if (next && next.classList.contains("json-detail")) {
+      next.remove();
+    } else {
+      // Remove any other expanded rows
+      document.querySelectorAll(".json-detail").forEach(el => el.remove());
+
+      const detail = document.createElement("div");
+      detail.className = "json-detail";
+      detail.innerHTML = `
+        <strong>Abstract:</strong> ${data.full.abstractNote || '—'}<br/>
+        <strong>URL:</strong> ${data.full.url ? `<a href="${data.full.url}" target="_blank">${data.full.url}</a>` : '—'}<br/>
+        <strong>Tags:</strong> ${(data.full.tags || []).map(tag => tag.tag).join(', ') || '—'}<br/>
+        <strong>DOI:</strong> ${data.full.DOI || '—'}<br/>
+        <strong>Extra:</strong> ${data.full.extra || '—'}
+      `;
+
+      const wrapper = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 6; // Adjust to match total column count
+      cell.appendChild(detail);
+      wrapper.className = "json-detail";
+      wrapper.appendChild(cell);
+
+      row.getElement().after(wrapper);
+    }
+  }
+}
           ],
         });
 
