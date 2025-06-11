@@ -5,12 +5,11 @@ Created by Ananthajith KR at stet dot in
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Zotero Viewer</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zotero Items</title>
 
   <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet"/>
-
   <style>
     body {
       font-family: sans-serif;
@@ -18,8 +17,8 @@ Created by Ananthajith KR at stet dot in
     }
     #search {
       margin-bottom: 1rem;
-      width: 300px;
       padding: 0.5rem;
+      width: 300px;
     }
     .tabulator .tabulator-row .tabulator-cell {
       white-space: nowrap;
@@ -27,16 +26,17 @@ Created by Ananthajith KR at stet dot in
       text-overflow: ellipsis;
     }
     .details-box {
-      padding: 1em;
+      padding: 1rem;
       background: #f9f9f9;
       border-top: 1px solid #ddd;
       font-size: 0.9rem;
-      line-height: 1.5;
+    }
+    .details-box div {
+      margin-bottom: 0.3em;
     }
     .details-box strong {
       display: inline-block;
       min-width: 120px;
-      font-weight: bold;
     }
   </style>
 </head>
@@ -51,7 +51,7 @@ Created by Ananthajith KR at stet dot in
   <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
 
   <script>
-    fetch('zotero_items.json')
+    fetch("zotero_items.json")
       .then(res => res.json())
       .then(data => {
         const table = new Tabulator("#zotero-table", {
@@ -59,39 +59,44 @@ Created by Ananthajith KR at stet dot in
           layout: "fitColumns",
           pagination: "local",
           paginationSize: 20,
-          placeholder: "No Data Found",
-          responsiveLayout: "collapse",
           columns: [
-            {title: "Title", field: "data.title", headerFilter: "input"},
-            {title: "Author", field: "data.creators[0].lastName", headerFilter: "input"},
+            {
+              formatter: function () {
+                return "<button>+</button>";
+              },
+              width: 40,
+              hozAlign: "center",
+              cellClick: function (e, cell) {
+                const row = cell.getRow();
+                row.getElement().classList.toggle("expanded");
+
+                if (row.getElement().nextSibling?.classList.contains("details-box")) {
+                  row.getElement().nextSibling.remove(); // remove if already there
+                } else {
+                  const data = row.getData().data;
+                  const creators = (data.creators || []).map(c => `${c.firstName || ""} ${c.lastName || ""}`).join(", ");
+                  const details = document.createElement("div");
+                  details.className = "details-box";
+                  details.innerHTML = `
+                    <div><strong>Title:</strong> ${data.title || '—'}</div>
+                    <div><strong>Author(s):</strong> ${creators || '—'}</div>
+                    <div><strong>Date:</strong> ${data.date || '—'}</div>
+                    <div><strong>Type:</strong> ${data.itemType || '—'}</div>
+                    <div><strong>Publication:</strong> ${data.publicationTitle || '—'}</div>
+                    <div><strong>URL:</strong> ${data.url ? `<a href="${data.url}" target="_blank">${data.url}</a>` : '—'}</div>
+                    <div><strong>DOI:</strong> ${data.DOI || '—'}</div>
+                    <div><strong>Abstract:</strong> ${data.abstractNote || '—'}</div>
+                  `;
+                  row.getElement().after(details);
+                }
+              }
+            },
+            {title: "Title", field: "data.title"},
+            {title: "Author", field: "data.creators[0].lastName"},
             {title: "Date", field: "data.date"},
             {title: "Type", field: "data.itemType"},
             {title: "Publication", field: "data.publicationTitle"},
-            {
-              formatter: "responsiveCollapse",
-              width: 30,
-              hozAlign: "center",
-              resizable: false,
-              headerSort: false
-            }
-          ],
-          responsiveLayoutCollapseFormatter: function(data) {
-            const fields = data.data;
-            const creators = fields.creators?.map(c => `${c.firstName || ''} ${c.lastName || ''}`).join(", ") || 'N/A';
-
-            return `
-              <div class="details-box">
-                <div><strong>Title:</strong> ${fields.title || '—'}</div>
-                <div><strong>Author(s):</strong> ${creators}</div>
-                <div><strong>Date:</strong> ${fields.date || '—'}</div>
-                <div><strong>Type:</strong> ${fields.itemType || '—'}</div>
-                <div><strong>Publication:</strong> ${fields.publicationTitle || '—'}</div>
-                <div><strong>URL:</strong> ${fields.url ? `<a href="${fields.url}" target="_blank">${fields.url}</a>` : '—'}</div>
-                <div><strong>DOI:</strong> ${fields.DOI || '—'}</div>
-                <div><strong>Abstract:</strong> ${fields.abstractNote || '—'}</div>
-              </div>
-            `;
-          }
+          ]
         });
 
         // Fuzzy search
@@ -108,13 +113,10 @@ Created by Ananthajith KR at stet dot in
         // Export buttons
         const exportDiv = document.createElement("div");
         exportDiv.innerHTML = `
-          <button onclick="table.download('csv', 'zotero.csv')">CSV</button>
-          <button onclick="table.download('json', 'zotero.json')">JSON</button>
-          <button onclick="table.download('xlsx', 'zotero.xlsx')">Excel</button>
-          <button onclick="table.download('pdf', 'zotero.pdf', {
-            orientation:'portrait',
-            title:'Zotero Items',
-          })">PDF</button>
+          <button onclick="table.download('csv', 'zotero.csv')">Export CSV</button>
+          <button onclick="table.download('json', 'zotero.json')">Export JSON</button>
+          <button onclick="table.download('xlsx', 'zotero.xlsx')">Export Excel</button>
+          <button onclick="table.download('pdf', 'zotero.pdf', {orientation:'portrait', title:'Zotero Items'})">Export PDF</button>
         `;
         document.body.insertBefore(exportDiv, document.getElementById("zotero-table"));
       });
