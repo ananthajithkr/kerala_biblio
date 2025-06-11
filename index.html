@@ -7,9 +7,8 @@ Created by Ananthajith KR at stet dot in
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Urava Biblio</title>
+  <title>Zotero Viewer</title>
 
-  <!-- Tabulator CSS -->
   <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet"/>
 
   <style>
@@ -27,31 +26,41 @@ Created by Ananthajith KR at stet dot in
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .details-box {
+      padding: 1em;
+      background: #f9f9f9;
+      border-top: 1px solid #ddd;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .details-box strong {
+      display: inline-block;
+      min-width: 120px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
 
-  <h1>Search Urava</h1>
+  <h1>Zotero Items</h1>
   <input type="text" id="search" placeholder="Search...">
   <div id="zotero-table"></div>
 
-  <!-- Tabulator Core + Export Module -->
   <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
   <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/modules/export.min.js"></script>
-  <!-- Fuse.js for fuzzy search -->
   <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
 
   <script>
     fetch('zotero_items.json')
       .then(res => res.json())
       .then(data => {
-        // Initialize Tabulator
         const table = new Tabulator("#zotero-table", {
           data: data,
           layout: "fitColumns",
           pagination: "local",
           paginationSize: 20,
           placeholder: "No Data Found",
+          responsiveLayout: "collapse",
           columns: [
             {title: "Title", field: "data.title", headerFilter: "input"},
             {title: "Author", field: "data.creators[0].lastName", headerFilter: "input"},
@@ -59,7 +68,6 @@ Created by Ananthajith KR at stet dot in
             {title: "Type", field: "data.itemType"},
             {title: "Publication", field: "data.publicationTitle"},
             {
-              title: "Details",
               formatter: "responsiveCollapse",
               width: 30,
               hozAlign: "center",
@@ -67,19 +75,26 @@ Created by Ananthajith KR at stet dot in
               headerSort: false
             }
           ],
-          responsiveLayout: "collapse",
-          rowFormatter: function(row) {
-            const data = row.getData();
-            const container = document.createElement("div");
-            container.innerHTML = `
-              <strong>Full Data:</strong>
-              <pre style="white-space: pre-wrap;">${JSON.stringify(data, null, 2)}</pre>
+          responsiveLayoutCollapseFormatter: function(data) {
+            const fields = data.data;
+            const creators = fields.creators?.map(c => `${c.firstName || ''} ${c.lastName || ''}`).join(", ") || 'N/A';
+
+            return `
+              <div class="details-box">
+                <div><strong>Title:</strong> ${fields.title || '—'}</div>
+                <div><strong>Author(s):</strong> ${creators}</div>
+                <div><strong>Date:</strong> ${fields.date || '—'}</div>
+                <div><strong>Type:</strong> ${fields.itemType || '—'}</div>
+                <div><strong>Publication:</strong> ${fields.publicationTitle || '—'}</div>
+                <div><strong>URL:</strong> ${fields.url ? `<a href="${fields.url}" target="_blank">${fields.url}</a>` : '—'}</div>
+                <div><strong>DOI:</strong> ${fields.DOI || '—'}</div>
+                <div><strong>Abstract:</strong> ${fields.abstractNote || '—'}</div>
+              </div>
             `;
-            row.getElement().appendChild(container);
           }
         });
 
-        // Fuse.js Fuzzy Search Setup
+        // Fuzzy search
         const fuse = new Fuse(data, {
           keys: ["data.title", "data.creators[0].lastName", "data.publicationTitle"],
           threshold: 0.4
@@ -87,15 +102,10 @@ Created by Ananthajith KR at stet dot in
 
         document.getElementById("search").addEventListener("input", (e) => {
           const query = e.target.value;
-          if (query) {
-            const result = fuse.search(query).map(r => r.item);
-            table.setData(result);
-          } else {
-            table.setData(data);
-          }
+          table.setData(query ? fuse.search(query).map(r => r.item) : data);
         });
 
-        // Global export buttons
+        // Export buttons
         const exportDiv = document.createElement("div");
         exportDiv.innerHTML = `
           <button onclick="table.download('csv', 'zotero.csv')">CSV</button>
