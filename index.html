@@ -1,99 +1,112 @@
+<!-- 
+Created by Ananthajith KR at stet dot in
+-->
+
 <!DOCTYPE html>
-<!-- Created by Ananthajith KR — stet.in -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Urava Biblio Search</title>
+  <title>Urava Biblio</title>
+
+  <!-- Tabulator CSS -->
   <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet"/>
+
   <style>
-    body { font-family: sans-serif; padding: 1rem; }
-    #search { margin-bottom: 1rem; width: 100%; padding: 0.5rem; font-size: 1rem; }
-    .tabulator-table .tabulator-row .tabulator-cell {
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+    }
+    #search {
+      margin-bottom: 1rem;
+      width: 300px;
+      padding: 0.5rem;
+    }
+    .tabulator .tabulator-row .tabulator-cell {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-    pre {
-      white-space: pre-wrap;
-      word-wrap: break-word;
     }
   </style>
 </head>
 <body>
 
-  <h1>Zotero Library</h1>
-  <input type="text" id="search" placeholder="Search items...">
-
+  <h1>Search Urava</h1>
+  <input type="text" id="search" placeholder="Search...">
   <div id="zotero-table"></div>
 
-  <script src="https://unpkg.com/fuse.js@6.6.2"></script>
+  <!-- Tabulator Core + Export Module -->
   <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+  <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/modules/export.min.js"></script>
+  <!-- Fuse.js for fuzzy search -->
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
 
   <script>
     fetch('zotero_items.json')
-      .then(response => response.json())
+      .then(res => res.json())
       .then(data => {
-        const items = data.map(item => {
-          const authors = (item.data.creators || [])
-            .map(c => c.name || [c.firstName, c.lastName].filter(Boolean).join(" "))
-            .join(", ");
-          return {
-            title: item.data.title || '',
-            authors: authors,
-            date: item.data.date || '',
-            type: item.data.itemType || '',
-            publication: item.data.publicationTitle || '',
-            raw: item
-          };
-        });
-
-        const fuse = new Fuse(items, {
-          keys: ['title', 'authors', 'date', 'type', 'publication'],
-          threshold: 0.3,
-        });
-
+        // Initialize Tabulator
         const table = new Tabulator("#zotero-table", {
-          data: items,
+          data: data,
           layout: "fitColumns",
           pagination: "local",
           paginationSize: 20,
+          placeholder: "No Data Found",
           columns: [
-            { title: "Title", field: "title", headerFilter: true },
-            { title: "Author(s)", field: "authors", headerFilter: true },
-            { title: "Date", field: "date", width: 100 },
-            { title: "Type", field: "type", width: 120 },
-            { title: "Publication", field: "publication" },
+            {title: "Title", field: "data.title", headerFilter: "input"},
+            {title: "Author", field: "data.creators[0].lastName", headerFilter: "input"},
+            {title: "Date", field: "data.date"},
+            {title: "Type", field: "data.itemType"},
+            {title: "Publication", field: "data.publicationTitle"},
             {
-              formatter: "buttonCross",
-              width: 100,
-              align: "center",
-              cellClick: function(e, cell) {
-                const item = cell.getRow().getData().raw;
-                alert(JSON.stringify(item.data, null, 2));
-              }
+              title: "Details",
+              formatter: "responsiveCollapse",
+              width: 30,
+              hozAlign: "center",
+              resizable: false,
+              headerSort: false
             }
           ],
-          height: "600px",
+          responsiveLayout: "collapse",
+          rowFormatter: function(row) {
+            const data = row.getData();
+            const container = document.createElement("div");
+            container.innerHTML = `
+              <strong>Full Data:</strong>
+              <pre style="white-space: pre-wrap;">${JSON.stringify(data, null, 2)}</pre>
+            `;
+            row.getElement().appendChild(container);
+          }
         });
 
-        const searchInput = document.getElementById('search');
-        searchInput.addEventListener("input", () => {
-          const query = searchInput.value.trim();
-          if (query === "") {
-            table.setData(items);
+        // Fuse.js Fuzzy Search Setup
+        const fuse = new Fuse(data, {
+          keys: ["data.title", "data.creators[0].lastName", "data.publicationTitle"],
+          threshold: 0.4
+        });
+
+        document.getElementById("search").addEventListener("input", (e) => {
+          const query = e.target.value;
+          if (query) {
+            const result = fuse.search(query).map(r => r.item);
+            table.setData(result);
           } else {
-            const results = fuse.search(query).map(r => r.item);
-            table.setData(results);
+            table.setData(data);
           }
         });
 
-        // Export shortcuts (optional)
-        document.addEventListener("keydown", (e) => {
-          if (e.ctrlKey && e.key === "e") {
-            table.download("csv", "zotero_export.csv");
-          }
-        });
+        // Global export buttons
+        const exportDiv = document.createElement("div");
+        exportDiv.innerHTML = `
+          <button onclick="table.download('csv', 'zotero.csv')">CSV</button>
+          <button onclick="table.download('json', 'zotero.json')">JSON</button>
+          <button onclick="table.download('xlsx', 'zotero.xlsx')">Excel</button>
+          <button onclick="table.download('pdf', 'zotero.pdf', {
+            orientation:'portrait',
+            title:'Zotero Items',
+          })">PDF</button>
+        `;
+        document.body.insertBefore(exportDiv, document.getElementById("zotero-table"));
       });
   </script>
 </body>
