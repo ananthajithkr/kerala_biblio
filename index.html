@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Urava Frontend</title>
 
   <!-- Tabulator CSS -->
-  <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet" />
+  <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet"/>
 
   <!-- Tabulator JS -->
   <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
@@ -14,12 +14,12 @@
   <!-- Fuse.js for fuzzy search -->
   <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
 
-  <!-- FileSaver for export -->
+  <!-- FileSaver.js for export support -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
-  
+  <!-- Attribution -->
   <!-- Created by Ananthajith KR at stet dot in -->
-  
+
   <style>
     body {
       font-family: sans-serif;
@@ -47,31 +47,27 @@
 
   <h1>Urava Search</h1>
   <input type="text" id="search" placeholder="Fuzzy search..." />
-
   <div id="zotero-table"></div>
 
   <script>
+    let tableData = [];
+    let table;
+    let fuse;
+
     fetch("zotero_items.json")
       .then(response => response.json())
       .then(data => {
-        const tableData = data.map(item => {
+        tableData = data.map(item => {
           const d = item.data || {};
-
           let authors = "—";
           if (d.creators && Array.isArray(d.creators)) {
             const names = d.creators.map(c => {
-              if (c.name) {
-                return c.name;
-              } else if (c.lastName || c.firstName) {
-                return `${c.lastName || ""}, ${c.firstName || ""}`.trim().replace(/^,|,$/g, '');
-              }
-              return null;
+              if (c.name) return c.name;
+              const full = [c.firstName, c.lastName].filter(Boolean).join(" ");
+              return full || null;
             }).filter(Boolean);
-            if (names.length > 0) {
-              authors = names.join("; ");
-            }
+            if (names.length) authors = names.join("; ");
           }
-
           return {
             id: item.key,
             author: authors,
@@ -83,62 +79,59 @@
           };
         });
 
-        const fuse = new Fuse(tableData, {
+        // Initialize Fuse
+        fuse = new Fuse(tableData, {
           keys: ["author", "title", "type", "publication"],
-          threshold: 0.3,
+          threshold: 0.4,
         });
 
-        const table = new Tabulator("#zotero-table", {
+        // Setup Tabulator
+        table = new Tabulator("#zotero-table", {
           data: tableData,
           layout: "fitColumns",
           pagination: "local",
           paginationSize: 10,
           columns: [
-            { title: "Author", field: "author" },
-            { title: "Title", field: "title", widthGrow: 2 },
+            { title: "Author", field: "author", widthGrow: 2 },
+            { title: "Title", field: "title", widthGrow: 3 },
             { title: "Date", field: "date", hozAlign: "center" },
             { title: "Type", field: "type" },
-            { title: "Publication", field: "publication" },
+            { title: "Publication", field: "publication", widthGrow: 2 },
             {
               title: "Details",
               formatter: () => "➕",
               hozAlign: "center",
               cellClick: function (e, cell) {
-  const row = cell.getRow();
-  const already = row.getElement().nextElementSibling;
+                const row = cell.getRow();
+                const el = row.getElement().nextElementSibling;
 
-  if (already && already.classList.contains("json-detail")) {
-    already.remove();
-  } else {
-    const data = row.getData().full;
-    const detail = document.createElement("div");
-    detail.className = "json-detail";
-    detail.style.background = "#f9f9f9";
-    detail.style.border = "1px solid #ccc";
-    detail.style.padding = "10px";
-    detail.style.margin = "10px 0";
-    detail.innerHTML = `
-      <strong>Abstract:</strong> ${data.abstractNote || '—'}<br/>
-      <strong>URL:</strong> ${data.url ? `<a href="${data.url}" target="_blank">${data.url}</a>` : '—'}<br/>
-      <strong>Tags:</strong> ${(data.tags || []).map(tag => tag.tag).join(', ') || '—'}<br/>
-      <strong>DOI:</strong> ${data.DOI || '—'}<br/>
-      <strong>Extra:</strong> ${data.extra || '—'}
-    `;
-
-    row.getElement().after(detail);
-  }
-}
+                if (el && el.classList.contains("json-detail")) {
+                  el.remove();
+                } else {
+                  const data = row.getData().full;
+                  const detail = document.createElement("div");
+                  detail.className = "json-detail";
+                  detail.innerHTML = `
+                    <strong>Abstract:</strong> ${data.abstractNote || '—'}<br/>
+                    <strong>URL:</strong> ${data.url ? `<a href="${data.url}" target="_blank">${data.url}</a>` : '—'}<br/>
+                    <strong>Tags:</strong> ${(data.tags || []).map(t => t.tag).join(", ") || '—'}<br/>
+                    <strong>DOI:</strong> ${data.DOI || '—'}<br/>
+                    <strong>Extra:</strong> ${data.extra || '—'}
+                  `;
+                  row.getElement().after(detail);
+                }
               }
             }
           ],
         });
 
+        // Search input listener
         document.getElementById("search").addEventListener("input", (e) => {
-          const query = e.target.value.trim();
-          if (!query) {
+          const q = e.target.value.trim();
+          if (!q) {
             table.setData(tableData);
           } else {
-            const results = fuse.search(query).map(r => r.item);
+            const results = fuse.search(q).map(r => r.item);
             table.setData(results);
           }
         });
@@ -153,6 +146,5 @@
         document.body.insertBefore(exportDiv, document.getElementById("zotero-table"));
       });
   </script>
-
 </body>
 </html>
