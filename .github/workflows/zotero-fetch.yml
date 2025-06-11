@@ -1,0 +1,23 @@
+from pyzotero import zotero
+import os
+import json
+
+API_KEY = os.environ['API_KEY']
+GROUP_ID = os.environ['GROUP_ID']
+LIBRARY_TYPE = 'group'
+
+zot = zotero.Zotero(GROUP_ID, LIBRARY_TYPE, API_KEY)
+
+items = []
+start = 0
+limit = 100
+
+while True:
+    batch = zot.top(limit=limit, start=start)
+    if not batch:
+        break
+    items.extend(batch)
+    start += limit
+
+with open('zotero.json', 'w') as f:
+    json.dump(items, f, indent=2)
