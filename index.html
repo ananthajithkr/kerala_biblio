@@ -104,16 +104,30 @@
               formatter: () => "➕",
               hozAlign: "center",
               cellClick: function (e, cell) {
-                const row = cell.getRow();
-                const already = row.getElement().nextElementSibling;
-                if (already && already.classList.contains("json-detail")) {
-                  already.remove();
-                } else {
-                  const detail = document.createElement("div");
-                  detail.className = "json-detail";
-                  detail.textContent = JSON.stringify(row.getData().full, null, 2);
-                  row.getElement().after(detail);
-                }
+  const row = cell.getRow();
+  const already = row.getElement().nextElementSibling;
+
+  if (already && already.classList.contains("json-detail")) {
+    already.remove();
+  } else {
+    const data = row.getData().full;
+    const detail = document.createElement("div");
+    detail.className = "json-detail";
+    detail.style.background = "#f9f9f9";
+    detail.style.border = "1px solid #ccc";
+    detail.style.padding = "10px";
+    detail.style.margin = "10px 0";
+    detail.innerHTML = `
+      <strong>Abstract:</strong> ${data.abstractNote || '—'}<br/>
+      <strong>URL:</strong> ${data.url ? `<a href="${data.url}" target="_blank">${data.url}</a>` : '—'}<br/>
+      <strong>Tags:</strong> ${(data.tags || []).map(tag => tag.tag).join(', ') || '—'}<br/>
+      <strong>DOI:</strong> ${data.DOI || '—'}<br/>
+      <strong>Extra:</strong> ${data.extra || '—'}
+    `;
+
+    row.getElement().after(detail);
+  }
+}
               }
             }
           ],
