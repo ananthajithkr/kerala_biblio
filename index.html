@@ -1,120 +1,132 @@
-<!-- 
-Created by Ananthajith KR at stet dot in
--->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Zotero Items</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Urava Frontend</title>
 
-  <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet"/>
+  <!-- Tabulator CSS -->
+  <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet" />
+
+  <!-- Tabulator JS -->
+  <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+
+  <!-- Fuse.js for fuzzy search -->
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+
+  <!-- FileSaver for export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  
+  <!-- Created by Ananthajith KR at stet dot in -->
+  
   <style>
     body {
       font-family: sans-serif;
-      padding: 1rem;
+      margin: 2em;
     }
     #search {
-      margin-bottom: 1rem;
-      padding: 0.5rem;
-      width: 300px;
+      margin-bottom: 1em;
+      width: 100%;
+      max-width: 400px;
+      padding: 0.5em;
+      font-size: 1em;
     }
-    .tabulator .tabulator-row .tabulator-cell {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .details-box {
-      padding: 1rem;
-      background: #f9f9f9;
-      border-top: 1px solid #ddd;
-      font-size: 0.9rem;
-    }
-    .details-box div {
-      margin-bottom: 0.3em;
-    }
-    .details-box strong {
-      display: inline-block;
-      min-width: 120px;
+    .json-detail {
+      font-family: monospace;
+      white-space: pre-wrap;
+      font-size: 0.9em;
+      background: #f6f8fa;
+      border-left: 3px solid #ccc;
+      padding: 1em;
+      margin-top: 0.5em;
     }
   </style>
 </head>
 <body>
 
-  <h1>Zotero Items</h1>
-  <input type="text" id="search" placeholder="Search...">
-  <div id="zotero-table"></div>
+  <h1>Urava Search</h1>
+  <input type="text" id="search" placeholder="Fuzzy search..." />
 
-  <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
-  <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/modules/export.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+  <div id="zotero-table"></div>
 
   <script>
     fetch("zotero_items.json")
-      .then(res => res.json())
+      .then(response => response.json())
       .then(data => {
+        const tableData = data.map(item => {
+          const d = item.data || {};
+
+          let authors = "—";
+          if (d.creators && Array.isArray(d.creators)) {
+            const names = d.creators.map(c => {
+              if (c.name) {
+                return c.name;
+              } else if (c.lastName || c.firstName) {
+                return `${c.lastName || ""}, ${c.firstName || ""}`.trim().replace(/^,|,$/g, '');
+              }
+              return null;
+            }).filter(Boolean);
+            if (names.length > 0) {
+              authors = names.join("; ");
+            }
+          }
+
+          return {
+            id: item.key,
+            author: authors,
+            title: d.title || "—",
+            date: d.date || "—",
+            type: d.itemType || "—",
+            publication: d.publicationTitle || d.bookTitle || d.websiteTitle || "—",
+            full: d,
+          };
+        });
+
+        const fuse = new Fuse(tableData, {
+          keys: ["author", "title", "type", "publication"],
+          threshold: 0.3,
+        });
+
         const table = new Tabulator("#zotero-table", {
-          data: data,
+          data: tableData,
           layout: "fitColumns",
           pagination: "local",
-          paginationSize: 20,
+          paginationSize: 10,
           columns: [
+            { title: "Author", field: "author" },
+            { title: "Title", field: "title", widthGrow: 2 },
+            { title: "Date", field: "date", hozAlign: "center" },
+            { title: "Type", field: "type" },
+            { title: "Publication", field: "publication" },
             {
-              formatter: function () {
-                return "<button>+</button>";
-              },
-              width: 40,
+              title: "Details",
+              formatter: () => "➕",
               hozAlign: "center",
               cellClick: function (e, cell) {
                 const row = cell.getRow();
-                row.getElement().classList.toggle("expanded");
-
-                if (row.getElement().nextSibling?.classList.contains("details-box")) {
-                  row.getElement().nextSibling.remove(); // remove if already there
+                const already = row.getElement().nextElementSibling;
+                if (already && already.classList.contains("json-detail")) {
+                  already.remove();
                 } else {
-                  const data = row.getData().data;
-                  const creators = (data.creators || []).map(c => `${c.firstName || ""} ${c.lastName || ""}`).join(", ");
-                  const details = document.createElement("div");
-                  details.className = "details-box";
-                  details.innerHTML = `
-                    <div><strong>Title:</strong> ${data.title || '—'}</div>
-                    <div><strong>Author(s):</strong> ${creators || '—'}</div>
-                    <div><strong>Date:</strong> ${data.date || '—'}</div>
-                    <div><strong>Type:</strong> ${data.itemType || '—'}</div>
-                    <div><strong>Publication:</strong> ${data.publicationTitle || '—'}</div>
-                    <div><strong>URL:</strong> ${data.url ? `<a href="${data.url}" target="_blank">${data.url}</a>` : '—'}</div>
-                    <div><strong>DOI:</strong> ${data.DOI || '—'}</div>
-                    <div><strong>Abstract:</strong> ${data.abstractNote || '—'}</div>
-                  `;
-                  row.getElement().after(details);
+                  const detail = document.createElement("div");
+                  detail.className = "json-detail";
+                  detail.textContent = JSON.stringify(row.getData().full, null, 2);
+                  row.getElement().after(detail);
                 }
               }
-            },
-            {title: "Title", field: "data.title"},
-            {
-  title: "Author",
-  formatter: function(cell) {
-    const creators = cell.getData().data.creators;
-    if (!creators || creators.length === 0) return "—";
-    return creators.map(c => `${c.lastName || ""}, ${c.firstName || ""}`).join("; ");
-  }
-},
-            {title: "Date", field: "data.date"},
-            {title: "Type", field: "data.itemType"},
-            {title: "Publication", field: "data.publicationTitle"},
-          ]
-        });
-
-        // Fuzzy search
-        const fuse = new Fuse(data, {
-          keys: ["data.title", "data.creators[0].lastName", "data.publicationTitle"],
-          threshold: 0.4
+            }
+          ],
         });
 
         document.getElementById("search").addEventListener("input", (e) => {
-          const query = e.target.value;
-          table.setData(query ? fuse.search(query).map(r => r.item) : data);
+          const query = e.target.value.trim();
+          if (!query) {
+            table.setData(tableData);
+          } else {
+            const results = fuse.search(query).map(r => r.item);
+            table.setData(results);
+          }
         });
 
         // Export buttons
@@ -122,11 +134,11 @@ Created by Ananthajith KR at stet dot in
         exportDiv.innerHTML = `
           <button onclick="table.download('csv', 'zotero.csv')">Export CSV</button>
           <button onclick="table.download('json', 'zotero.json')">Export JSON</button>
-          <button onclick="table.download('xlsx', 'zotero.xlsx')">Export Excel</button>
-          <button onclick="table.download('pdf', 'zotero.pdf', {orientation:'portrait', title:'Zotero Items'})">Export PDF</button>
+          <button onclick="table.download('xlsx', 'zotero.xlsx', {sheetName:'Zotero'})">Export Excel</button>
         `;
         document.body.insertBefore(exportDiv, document.getElementById("zotero-table"));
       });
   </script>
+
 </body>
 </html>
