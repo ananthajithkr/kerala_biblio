@@ -92,7 +92,14 @@ Created by Ananthajith KR at stet dot in
               }
             },
             {title: "Title", field: "data.title"},
-            {title: "Author", field: "data.creators[0].lastName"},
+            {
+  title: "Author",
+  formatter: function(cell) {
+    const creators = cell.getData().data.creators;
+    if (!creators || creators.length === 0) return "—";
+    return creators.map(c => `${c.lastName || ""}, ${c.firstName || ""}`).join("; ");
+  }
+},
             {title: "Date", field: "data.date"},
             {title: "Type", field: "data.itemType"},
             {title: "Publication", field: "data.publicationTitle"},
