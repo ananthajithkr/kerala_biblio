@@ -4,11 +4,11 @@ import os
 import json
 from pyzotero import zotero
 
-API_KEY = os.environ.get("OW2Fey2B0ogOCnsxDWZzJFjt")
-GROUP_ID = os.environ.get("283088")  # Your numeric group ID
+API_KEY = os.environ.get("API_KEY")
+GROUP_ID = os.environ.get("GROUP_ID")
 
 # Initialize Zotero client for a group library
-zot = zotero.Zotero(GROUP_ID, 'group', API_KEY)
+zot = zotero.Zotero(int(GROUP_ID), 'group', API_KEY)
 
 all_items = []
 start = 0
