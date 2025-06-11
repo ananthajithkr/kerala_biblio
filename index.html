@@ -1,101 +1,100 @@
 <!DOCTYPE html>
+<!-- Created by Ananthajith KR — stet.in -->
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Zotero Items</title>
-  <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Urava Biblio Search</title>
+  <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet"/>
   <style>
-    #search-box {
-      margin: 10px;
-      padding: 5px;
-      width: 300px;
+    body { font-family: sans-serif; padding: 1rem; }
+    #search { margin-bottom: 1rem; width: 100%; padding: 0.5rem; font-size: 1rem; }
+    .tabulator-table .tabulator-row .tabulator-cell {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    #export-buttons {
-      margin: 10px;
-    }
-    button {
-      margin-right: 10px;
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
     }
   </style>
 </head>
 <body>
-  <h1>Zotero Items</h1>
 
-  <input type="text" id="search-box" placeholder="Search all fields...">
-
-  <div id="export-buttons">
-    <button id="download-csv">Export CSV</button>
-    <button id="download-json">Export JSON</button>
-    <button id="download-xlsx">Export XLSX</button>
-  </div>
+  <h1>Zotero Library</h1>
+  <input type="text" id="search" placeholder="Search items...">
 
   <div id="zotero-table"></div>
 
-  <script src="https://unpkg.com/fuse.js@7.0.0"></script>
+  <script src="https://unpkg.com/fuse.js@6.6.2"></script>
   <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
-  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 
   <script>
-    let table;
-    let fuse;
-    let fullData = [];
-    let columns = [];
+    fetch('zotero_items.json')
+      .then(response => response.json())
+      .then(data => {
+        const items = data.map(item => {
+          const authors = (item.data.creators || [])
+            .map(c => c.name || [c.firstName, c.lastName].filter(Boolean).join(" "))
+            .join(", ");
+          return {
+            title: item.data.title || '',
+            authors: authors,
+            date: item.data.date || '',
+            type: item.data.itemType || '',
+            publication: item.data.publicationTitle || '',
+            raw: item
+          };
+        });
 
-    async function loadData() {
-      const response = await fetch('zotero_items.json');
-      const items = await response.json();
+        const fuse = new Fuse(items, {
+          keys: ['title', 'authors', 'date', 'type', 'publication'],
+          threshold: 0.3,
+        });
 
-      // Extract fields from item.data
-      fullData = items.map(item => ({ id: item.key, ...item.data }));
+        const table = new Tabulator("#zotero-table", {
+          data: items,
+          layout: "fitColumns",
+          pagination: "local",
+          paginationSize: 20,
+          columns: [
+            { title: "Title", field: "title", headerFilter: true },
+            { title: "Author(s)", field: "authors", headerFilter: true },
+            { title: "Date", field: "date", width: 100 },
+            { title: "Type", field: "type", width: 120 },
+            { title: "Publication", field: "publication" },
+            {
+              formatter: "buttonCross",
+              width: 100,
+              align: "center",
+              cellClick: function(e, cell) {
+                const item = cell.getRow().getData().raw;
+                alert(JSON.stringify(item.data, null, 2));
+              }
+            }
+          ],
+          height: "600px",
+        });
 
-      // Dynamically create columns from all fields in first item
-      const sample = fullData[0];
-      columns = Object.keys(sample).map(key => ({
-        title: key.charAt(0).toUpperCase() + key.slice(1),
-        field: key,
-        headerFilter: "input",
-        widthGrow: 1
-      }));
+        const searchInput = document.getElementById('search');
+        searchInput.addEventListener("input", () => {
+          const query = searchInput.value.trim();
+          if (query === "") {
+            table.setData(items);
+          } else {
+            const results = fuse.search(query).map(r => r.item);
+            table.setData(results);
+          }
+        });
 
-      // Fuse config to search all fields
-      fuse = new Fuse(fullData, {
-        keys: Object.keys(sample),
-        threshold: 0.4,
-        ignoreLocation: true,
-        includeScore: false
+        // Export shortcuts (optional)
+        document.addEventListener("keydown", (e) => {
+          if (e.ctrlKey && e.key === "e") {
+            table.download("csv", "zotero_export.csv");
+          }
+        });
       });
-
-      table = new Tabulator("#zotero-table", {
-        data: fullData,
-        layout: "fitDataStretch",
-        columns: columns
-      });
-    }
-
-    document.getElementById('search-box').addEventListener('input', (e) => {
-      const query = e.target.value;
-      if (query.trim() === "") {
-        table.setData(fullData);
-      } else {
-        const results = fuse.search(query);
-        table.setData(results.map(r => r.item));
-      }
-    });
-
-    // Export buttons
-    document.getElementById('download-csv').addEventListener('click', () => {
-      table.download("csv", "zotero_items.csv");
-    });
-
-    document.getElementById('download-json').addEventListener('click', () => {
-      table.download("json", "zotero_items.json");
-    });
-
-    document.getElementById('download-xlsx').addEventListener('click', () => {
-      table.download("xlsx", "zotero_items.xlsx", { sheetName: "ZoteroItems" });
-    });
-
-    loadData();
   </script>
 </body>
 </html>
